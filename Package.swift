@@ -2,18 +2,24 @@
 import PackageDescription
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CLAUDE.md override (deliberate):
-// The project rule "no external Swift package dependencies — everything is
-// local" is overridden HERE, for `LibSignalClient` only. Reasons:
-//   1. Implementing a Signal-protocol client from scratch is unsafe (Signal
-//      itself warns against rolling your own).
-//   2. The wire format MUST interoperate with the web client which already
-//      uses signalapp/libsignal — the only practical way to interop is to
-//      use the same library.
-//   3. The library is published, audited, and maintained by Signal directly.
-// Long-term: vendor the xcframework + Swift sources under `Vendored/` and
-// switch this back to a `.binaryTarget` + local `.target` to restore the
-// in-tree posture. Tracked in S28.7 §3 as the vendoring follow-up.
+// LibSignalClient integration NOTE:
+// All Signal-protocol code (SignalSecureMessaging, SignalPairingService,
+// SignalProtocolStores) is gated behind `#if canImport(LibSignalClient)`
+// and currently compiles OUT — the plugin falls back to StubSecureMessaging
+// (fail-closed: throws notReady on any e2e send/decrypt).
+//
+// To activate it:
+//   1. Add a remote dep below (or vendor the xcframework + Swift sources
+//      under `Vendored/LibSignalClient/` and add a `.binaryTarget`).
+//   2. Add `.product(name: "LibSignalClient", package: "<pkg>")` to the
+//      MeinChatPlusPlugin target's dependencies.
+//   3. Resolve the graph; `canImport(LibSignalClient)` flips true and the
+//      real send/read/pairing flows activate.
+//
+// We previously pinned `https://github.com/signalapp/libsignal` at
+// `from: "0.50.0"` but that version pin failed to resolve in this project's
+// Xcode and collapsed the whole SPM graph. Reinstate when we know the right
+// version / URL / product name for the signal release we want.
 // ─────────────────────────────────────────────────────────────────────────────
 
 let package = Package(
@@ -28,10 +34,6 @@ let package = Package(
     dependencies: [
         .package(path: "../vbwd-ios-core"),
         .package(path: "../vbwd-ios-plugin-meinchat"),
-        // Signal Protocol implementation. Pinned to a recent 0.x release.
-        // If `swift package resolve` fails to find this version, bump to a
-        // version published in github.com/signalapp/libsignal/releases.
-        .package(url: "https://github.com/signalapp/libsignal", from: "0.50.0"),
     ],
     targets: [
         .target(
@@ -39,7 +41,6 @@ let package = Package(
             dependencies: [
                 .product(name: "VBWDCore", package: "vbwd-ios-core"),
                 .product(name: "MeinChatPlugin", package: "vbwd-ios-plugin-meinchat"),
-                .product(name: "LibSignalClient", package: "libsignal"),
             ],
             path: "Sources/MeinChatPlusPlugin",
             swiftSettings: [
