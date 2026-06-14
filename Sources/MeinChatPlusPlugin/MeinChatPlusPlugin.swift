@@ -55,6 +55,22 @@ public final class MeinChatPlusPlugin: Plugin, @unchecked Sendable {
         let prekeys = DefaultPrekeyService(api: sdk.api)
         let identity = KeychainIdentityStore()
 
+        // S67.2 — APNs token registration for the meinchat-plus app surface
+        // (mirror of meinchat §3.5; auth-aware sink, ask-once permission
+        // prompt after login, best-effort unregister on logout).
+        let pushService = DefaultPushRegistrationService(api: sdk.api)
+        let tokenSink = MeinChatPlusTokenSink(service: pushService)
+        await sdk.notifications.registerSink(tokenSink)
+        sdk.events.on(AppEvents.authLogin) { _ in
+            Task { @MainActor in
+                await MeinChatPlusNotificationPermissions.askOnce()
+                await tokenSink.handleLogin()
+            }
+        }
+        sdk.events.on(AppEvents.authLogout) { _ in
+            Task { await tokenSink.handleLogout() }
+        }
+
         // Cross-plugin secure-messaging contract: meinchat discovers our
         // service via `MeinChatSecureMessagingStoreID`. We register the
         // real Signal-backed implementation when LibSignalClient resolves,

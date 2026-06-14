@@ -15,4 +15,10 @@ enum MeinChatPlusEndpoints {
     static let signedPrekey = "/me/prekeys/signed"
     static let oneTimePrekeys = "/me/prekeys/one-time"
     static let prekeyStatus = "/me/prekeys/status"
+
+    // Device push registration (S67). Distinct from the Signal device
+    // registry above — this is the APNs token upsert (idempotent POST,
+    // owner-only DELETE).
+    static let deviceRegister = "/devices/register"
+    static func deviceUnregister(token: String) -> String { "/devices/\(token)" }
 }
